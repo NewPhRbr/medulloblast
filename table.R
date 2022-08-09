@@ -29,9 +29,12 @@ data <- data %>%
 
 
 # Ищем пациентов, которые есть в базе ---------------------------------------------------------
-# Для таблицы
 
-data_double_first <- data %>% 
+data_one_new <- data_redcap %>%
+  select(record_id,relapse,relapse_dt,event,event_date) %>% 
+  filter(event == 'REL' & is.na(relapse)) # ищем, у кого не проставлен рецидив
+
+data_double_first <- data %>% # Таблица с первичными записями
   select(first_name,
          last_name,
          birthdate,
@@ -41,7 +44,7 @@ data_double_first <- data %>%
          mgroup) %>% 
   mutate(pat_fio = paste(last_name,str_sub(`first_name`,1,1),gsub("-", "",birthdate), sep = "_"))
 
-data_double_rel <- data %>% 
+data_double_rel <- data %>% # таблица с записями рецидивов
   select(first_name,
          last_name,
          birthdate,
@@ -67,9 +70,46 @@ data_one <- data_redcap %>%
          outcome,
          outcome_date) %>%
   mutate(pat_fio = paste(last_name,str_sub(`first_name`,1,1),gsub("-", "",birthdate), sep = "_"))
-  data_one[data_one$record_id %in% data_one_new$record_id, 'relapse'] <-  '1'
-
+  data_one[data_one$record_id %in% data_one_new$record_id, 'relapse'] <-  '1' # исправляем ошибки рецидивов
+  data_one[data_one$record_id %in% data_one_new$record_id, 'relapse_dt'] <- data_one_new$event_date
 data_double <- data_one %>% 
   full_join(data_double, by = 'pat_fio') %>% 
   filter(!is.na(table_id) | (!is.na(record_id) & relapse == 1))
+
+
+# Переименовываем столбцы ------------
+labels <- c(record_id = 'record_id',
+            first_name = 'Имя (база)',
+            last_name = 'Фамилия (база)',
+            birthdate = 'Дата рождения (база)',
+            ds_dt = 'Дата установления первичного диагноза МБ (база)',
+            date = 'Дата операции (база)',
+            relapse = 'Рецидив (база)',
+            relapse_dt.x = 'Дата рецидива (база)',
+            mgroup.x = 'Молекулярная группа (база)',
+            outcome.x = 'Исход (база)',
+            outcome_date.x = 'Дата исхода (база)',
+            pat_fio = 'Ключ',
+            first_name...1 = 'Имя (таблица, первычный)',
+            last_name...2 = 'Фамилия (таблица, первычный)',
+            birthdate...3 = 'Дата рождения (таблица, первычный)',
+            ds_dt...4 = 'Дата установления первичного диагноза МБ (таблица, первычный)',
+            date...5 = 'Дата операции (таблица, первычный)',
+            relapse_dt.y = 'Дата рецидива (таблица, первычный)',
+            mgroup.y = 'Молекулярная группа (таблица, первычный)',
+            first_name...9 = 'Имя (таблица, рецидив)',
+            last_name...10 = 'Фамилия (таблица, рецидив)',
+            birthdate...11 = 'Дата рождения (таблица, рецидив)',
+            ds_dt...12 = 'Дата установления первичного диагноза МБ (таблица, рецидив)',
+            date...13 = 'Дата операции (таблица)',
+            outcome.y = 'Исход (таблица)',
+            outcome_date.y = 'Дата исхода (таблица)',
+            table_id = 'table_id')
+
+data_double <- data_double %>% 
+  select(record_id, table_id, pat_fio,	first_name,	last_name,	birthdate,	ds_dt,	date,	relapse,	relapse_dt.x,	mgroup.x,	
+             outcome.x,	outcome_date.x,	first_name...1,	last_name...2,	birthdate...3,	ds_dt...4,	date...5,	relapse_dt.y,	mgroup.y,	
+             first_name...9,	last_name...10,	birthdate...11,	ds_dt...12,	date...13,	outcome.y,	outcome_date.y) # задаём порядок столбцов
+
+data_double <- data_double %>% rename_with(~ labels[.])
 openxlsx::write.xlsx(data_double, 'data.xlsx')
